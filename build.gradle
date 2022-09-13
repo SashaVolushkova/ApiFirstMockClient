@@ -2,7 +2,9 @@ plugins {
 	id 'org.springframework.boot' version '2.7.3'
 	id 'io.spring.dependency-management' version '1.0.13.RELEASE'
 	id 'java'
+	id "org.openapi.generator" version "6.1.0"
 }
+apply plugin: 'maven-publish'
 
 group = 'com.volushkova.apifirst'
 version = '0.0.1-SNAPSHOT'
@@ -14,9 +16,62 @@ repositories {
 
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter'
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
-}
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation('org.springframework.boot:spring-boot-starter-logging')
+	implementation('org.springframework.boot:spring-boot-starter-validation')
+
+	implementation group: 'org.springdoc', name: 'springdoc-openapi-ui', version: '1.6.11'
+	implementation group: 'org.openapitools', name: 'jackson-databind-nullable', version: '0.2.2'
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'}
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+openApiGenerate {
+	generatorName = "spring"
+	inputSpec = "${project.projectDir}/src/main/resources/server.yaml".toString()
+	outputDir = "${project.projectDir}".toString()
+	globalProperties = [
+			apis: "",
+			models: "",
+			supportingFiles: ""
+	]
+	apiPackage = "com.volushkova.apifirst.generated"
+	invokerPackage = "com.volushkova.apifirst.generated.mock"
+	modelPackage = "com.volushkova.apifirst.generated.model"
+	skipOverwrite = true
+	configOptions = [
+			dateLibrary: "java8"
+	]
+}
+
+openApiValidate {
+	inputSpec = "${project.projectDir}/src/main/resources/server.yaml".toString()
+	recommend = true
+}
+
+task assembleArtifact(type: Zip, group: 'server-api') {
+	archiveName 'server-api.zip'
+	destinationDir file("$buildDir/libs/")
+	from "src/main/resources/server.yaml"
+	description "Assemble archive $archiveName into ${relativePath(destinationDir)}"
+}
+
+publishing {
+	publications {
+		mavenJava(MavenPublication) {
+			artifact source: assembleArtifact, extension: 'zip'
+		}
+	}
+	repositories {
+		maven {
+			credentials {
+				username "admin"
+				password "admin"
+			}
+			url "http://localhost:8081/repository/apifirst-snapshot/"
+			allowInsecureProtocol = true
+		}
+	}
 }
